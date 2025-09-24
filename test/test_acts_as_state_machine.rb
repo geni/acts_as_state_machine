@@ -14,15 +14,10 @@ $LOG = StringIO.new
 $LOGGER = Logger.new($LOG)
 ActiveRecord::Base.logger = $LOGGER
 
-ActiveRecord::Base.configurations = {
-  "sqlite" => {
-    :adapter => "sqlite",
-    :dbfile  => "state_machine.sqlite.db"
-  },
-
+configurations = {
   "sqlite3" => {
-    :adapter => "sqlite3",
-    :dbfile  => "state_machine.sqlite3.db"
+    :adapter  => "sqlite3",
+    :database => "test/state_machine.sqlite3.db"
   },
 
   "mysql" => {
@@ -36,14 +31,19 @@ ActiveRecord::Base.configurations = {
   "postgresql" => {
     :min_messages => "ERROR",
     :adapter      => "postgresql",
+    :host         => "localhost",
     :username     => "postgres",
-    :password     => "postgres",
+    :password     => '',
     :database     => "state_machine_test"
   }
 }
 
 # Connect to the database.
-ActiveRecord::Base.establish_connection(ENV["DB"] || "sqlite")
+ActiveRecord::Base.establish_connection(configurations[ENV['DB'] || 'sqlite3'])
+
+if ENV['DB'] == 'postgresql'
+  ActiveRecord::Base.connection.execute("DROP DATABASE IF EXISTS state_machine_test ; CREATE DATABASE state_machine_test;")
+end
 
 # Create table for conversations.
 ActiveRecord::Migration.verbose = false
@@ -56,12 +56,14 @@ ActiveRecord::Schema.define(:version => 1) do
 end
 
 class Test::Unit::TestCase
-  self.fixture_path = File.dirname(__FILE__) + "/fixtures/"
-  self.use_transactional_fixtures = true
+  include ActiveRecord::TestFixtures
+
+  self.fixture_paths = [File.dirname(__FILE__) + "/fixtures/"]
+  self.use_transactional_tests = true
   self.use_instantiated_fixtures  = false
 
   def create_fixtures(*table_names, &block)
-    Fixtures.create_fixtures(Test::Unit::TestCase.fixture_path, table_names, &block)
+    Fixtures.create_fixtures(Test::Unit::TestCase.fixture_paths, table_names, &block)
   end
 end
 
