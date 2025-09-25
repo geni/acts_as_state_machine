@@ -1,5 +1,7 @@
 require 'acts_as_state_machine'
 
-ActiveRecord::Base.class_eval do
-  include ScottBarron::Acts::StateMachine
+if defined?(ApplicationRecord)
+  ApplicationRecord.send(:include, ScottBarron::Acts::StateMachine)
+else
+  ActiveRecord::Base.send(:include, ScottBarron::Acts::StateMachine)
 end

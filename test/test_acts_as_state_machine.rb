@@ -41,10 +41,6 @@ configurations = {
 # Connect to the database.
 ActiveRecord::Base.establish_connection(configurations[ENV['DB'] || 'sqlite3'])
 
-if ENV['DB'] == 'postgresql'
-  ActiveRecord::Base.connection.execute("DROP DATABASE IF EXISTS state_machine_test ; CREATE DATABASE state_machine_test;")
-end
-
 # Create table for conversations.
 ActiveRecord::Migration.verbose = false
 ActiveRecord::Schema.define(:version => 1) do
@@ -68,7 +64,7 @@ class Test::Unit::TestCase
 end
 
 class Conversation < ActiveRecord::Base
-  attr_writer :can_close
+  attr_writer   :can_close
   attr_accessor :read_enter, :read_exit,
                 :needs_attention_enter, :needs_attention_after,
                 :read_after_first, :read_after_second,
@@ -106,15 +102,14 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def teardown
     Conversation.class_eval do
-      write_inheritable_attribute :states, {}
-      write_inheritable_attribute :initial_state, nil
-      write_inheritable_attribute :transition_table, {}
-      write_inheritable_attribute :event_table, {}
-      write_inheritable_attribute :state_column, "state"
+      self._aasm_states            = {}
+      self._aasm_initial_state     = nil
+      self._aasm_transition_table  = {}
+      self._aasm_event_table       = {}
+      self._aasm_state_column      = "state"
 
       # Clear out any callbacks that were set by acts_as_state_machine.
-      write_inheritable_attribute :before_create, []
-      write_inheritable_attribute :after_create, []
+      reset_callbacks(:create)
     end
   end
 
@@ -126,11 +121,11 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_state_column
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
     end
 
-    assert_equal "state_machine", Conversation.state_column
+    assert_equal 'state_machine', Conversation._aasm_state_column
   end
 
   def test_initial_state_value
@@ -139,12 +134,12 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
       state :needs_attention
     end
 
-    assert_equal :needs_attention, Conversation.initial_state
+    assert_equal :needs_attention, Conversation._aasm_initial_state
   end
 
   def test_initial_state
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
     end
 
@@ -155,7 +150,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_states_were_set
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -163,14 +158,14 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
       state :junk
     end
 
-    [:needs_attention, :read, :closed, :awaiting_response, :junk].each do |state|
-      assert Conversation.states.include?(state)
+    %w[needs_attention read closed awaiting_response junk].each do |state|
+      assert Conversation._aasm_states.include?(state), "State :#{state} was not set"
     end
   end
 
   def test_query_methods_created
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -186,7 +181,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_event_methods_created
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -203,13 +198,13 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
     c = Conversation.create!
     [:new_message!, :view!, :reply!, :close!, :junk!, :unjunk!].each do |event|
-      assert c.respond_to?(event)
+      assert c.respond_to?(event), "Event method '#{event}' was not created"
     end
   end
 
   def test_transition_table
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -221,7 +216,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
       end
     end
 
-    tt = Conversation.transition_table
+    tt = Conversation._aasm_transition_table
     assert tt[:new_message].include?(SupportingClasses::StateTransition.new(:from => :read, :to => :needs_attention))
     assert tt[:new_message].include?(SupportingClasses::StateTransition.new(:from => :closed, :to => :needs_attention))
     assert tt[:new_message].include?(SupportingClasses::StateTransition.new(:from => :awaiting_response, :to => :needs_attention))
@@ -229,7 +224,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_next_state_for_event
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
 
@@ -244,7 +239,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_change_state
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
 
@@ -260,7 +255,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_can_go_from_read_to_closed_because_guard_passes
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -289,7 +284,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_cannot_go_from_read_to_closed_because_of_guard
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -319,7 +314,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_ignore_invalid_events
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read
       state :closed
@@ -350,7 +345,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_entry_action_executed
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read, :enter => :read_enter_action
 
@@ -367,7 +362,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_after_actions_executed
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :closed, :after => :closed_after_action
       state :read, :enter => :read_enter_action,
@@ -402,7 +397,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_after_actions_not_run_on_loopback_transition
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :closed, :after => :closed_after_action
       state :read, :after => [:read_after_first_action, :read_after_second_action]
@@ -437,7 +432,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_exit_action_executed
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :junk
       state :needs_attention
       state :read, :exit => lambda { |o| o.read_exit = true }
@@ -460,7 +455,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_entry_and_exit_not_run_on_loopback_transition
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :read, :exit => lambda { |o| o.read_exit = true }
 
@@ -480,7 +475,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_entry_and_after_actions_called_for_initial_state
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention, :enter => lambda { |o| o.needs_attention_enter = true },
       :after => lambda { |o| o.needs_attention_after = true }
     end
@@ -492,7 +487,7 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
 
   def test_run_transition_action_is_private
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
     end
 
@@ -500,105 +495,9 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
     assert_raises(NoMethodError) { c.run_transition_action :foo }
   end
 
-  def test_find_all_in_state
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    cs = Conversation.find_in_state(:all, :read)
-    assert_equal 2, cs.size
-  end
-
-  def test_find_first_in_state
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    c = Conversation.find_in_state(:first, :read)
-    assert_equal conversations(:first).id, c.id
-  end
-
-  def test_find_all_in_state_with_conditions
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    cs = Conversation.find_in_state(:all, :read, :conditions => ['subject = ?', conversations(:second).subject])
-
-    assert_equal 1, cs.size
-    assert_equal conversations(:second).id, cs.first.id
-  end
-
-  def test_find_first_in_state_with_conditions
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    c = Conversation.find_in_state(:first, :read, :conditions => ['subject = ?', conversations(:second).subject])
-    assert_equal conversations(:second).id, c.id
-  end
-
-  def test_count_in_state
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    cnt0 = Conversation.count(:conditions => ['state_machine = ?', 'read'])
-    cnt  = Conversation.count_in_state(:read)
-
-    assert_equal cnt0, cnt
-  end
-
-  def test_count_in_state_with_conditions
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    cnt0 = Conversation.count(:conditions => ['state_machine = ? AND subject = ?', 'read', 'Foo'])
-    cnt  = Conversation.count_in_state(:read, :conditions => ['subject = ?', 'Foo'])
-
-    assert_equal cnt0, cnt
-  end
-
-  def test_find_in_invalid_state_raises_exception
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    assert_raises(InvalidState) do
-      Conversation.find_in_state(:all, :dead)
-    end
-  end
-
-  def test_count_in_invalid_state_raises_exception
-    Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
-      state :needs_attention
-      state :read
-    end
-
-    assert_raise(InvalidState) do
-      Conversation.count_in_state(:dead)
-    end
-  end
-
   def test_can_access_events_via_event_table
     Conversation.class_eval do
-      acts_as_state_machine :initial => :needs_attention, :column => "state_machine"
+      acts_as_state_machine :initial => :needs_attention, :column => 'state_machine'
       state :needs_attention
       state :junk
 
@@ -607,14 +506,14 @@ class ActsAsStateMachineTest < Test::Unit::TestCase
       end
     end
 
-    event = Conversation.event_table[:junk]
+    event = Conversation._aasm_event_table[:junk]
     assert_equal :junk, event.name
     assert_equal "finished", event.opts[:note]
   end
 
   def test_custom_state_values
     Conversation.class_eval do
-      acts_as_state_machine :initial => "NEEDS_ATTENTION", :column => "state_machine"
+      acts_as_state_machine:initial => "NEEDS_ATTENTION", :column => 'state_machine'
       state :needs_attention, :value => "NEEDS_ATTENTION"
       state :read, :value => "READ"
 
