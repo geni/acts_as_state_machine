@@ -227,3 +227,9 @@ module ScottBarron                   #:nodoc:
     end # module StateMachine
   end # module Acts
 end # module ScottBarron
+
+if defined?(ApplicationRecord)
+  ApplicationRecord.send(:include, ScottBarron::Acts::StateMachine)
+else
+  ActiveRecord::Base.send(:include, ScottBarron::Acts::StateMachine)
+end

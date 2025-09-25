@@ -6,7 +6,7 @@ require "active_record"
 require "active_record/fixtures"
 
 $:.unshift File.dirname(__FILE__) + "/../lib"
-require File.dirname(__FILE__) + "/../init"
+require 'acts_as_state_machine'
 
 # Log everything to a global StringIO object instead of a file.
 require "stringio"
