@@ -22,7 +22,7 @@ configurations = {
 
   "mysql" => {
     :adapter  => "mysql",
-    :host     => "localhost",
+    :host     => ENV.fetch('DB_HOST', 'localhost'),
     :username => "rails",
     :password => nil,
     :database => "state_machine_test"
@@ -31,7 +31,7 @@ configurations = {
   "postgresql" => {
     :min_messages => "ERROR",
     :adapter      => "postgresql",
-    :host         => "localhost",
+    :host         => ENV.fetch('DB_HOST', 'localhost'),
     :username     => "postgres",
     :password     => '',
     :database     => "state_machine_test"
