@@ -16,5 +16,5 @@ bundle install
 
 DB='sqlite3' bundle exec rake
 
-psql -c 'drop database if exists state_machine_test;' -c 'create database state_machine_test;' -U postgres
+#psql -c 'drop database if exists state_machine_test;' -c 'create database state_machine_test;' -U postgres
 DB='postgresql' bundle exec rake
